@@ -1,0 +1,11 @@
+#server:
+#  port: 8090
+#
+#spring:
+#  datasource:
+#
+#    Sjzt:
+#      driver-class-name: com.mysql.cj.jdbc.Driver
+#      jdbc-url: jdbc:mysql://139.224.70.154:3306/ObjectLibDB?useUnicode=true&characterEncoding=UTF-8&useSSL=false
+#      username: root
+#      password: Sjzt|123
