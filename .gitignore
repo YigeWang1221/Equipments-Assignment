@@ -1,0 +1,15 @@
+.DS_Store
+**/.DS_Store
+**/node_modules/
+**/target/
+**/dist/
+**/dist-dev/
+**/dist-pro/
+**/logs/
+backend/data/
+backend/.mysql-data/
+*.log
+.env.local
+.env.*.local
+.idea/
+**/.idea/

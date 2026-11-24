@@ -2,9 +2,10 @@
 //子组件，主要是一个el-list 是这个班级过去的所有作业和情况的list
 import { useUserStore } from '@/store/modules/user'
 import { defineProps } from 'vue'
-import { propTypes } from '@/utils/propTypes'
-import axios from 'axios'
-import { ElDivider, ElMessage } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { getClass } from '@/api/equip/classes'
+import { getWorks, deleteWork } from '@/api/equip/works'
+import { exportClassGrades } from '@/api/equip/exports'
 
 export default {
   data() {
@@ -16,7 +17,7 @@ export default {
     }
   },
   created() {
-    const usrStore = new useUserStore()
+    const usrStore = useUserStore()
     this.classId = usrStore.getClassID
     this.getBasicInfo(this.classId)
     console.log('教师作业列表classId ' + this.classId)
@@ -50,88 +51,42 @@ export default {
       })
     },
     async getBasicInfo(classId) {
-      let url1 = 'http://47.120.78.42:8090/zjgsEmb/TeacherClass/getClassById'
-      let url2 = 'http://47.120.78.42:8090/zjgsEmb/TeacherWork/getTeacherWorkByClassId'
+      const classInfo = await getClass(classId)
+      this.className = classInfo.className
 
-      const res1 = await axios.get(url1, {
-        params: {
-          classId: classId
-        }
-      })
-      this.className = res1.data.data.className
-
-      const res2 = await axios.get(url2, {
-        params: {
-          classId: classId
-        }
-      })
-      this.TeacherWorkList = res2.data.data
-      for (let i = 0; i < this.TeacherWorkList.length; i++) {
-        const item = this.TeacherWorkList[i]
-        switch (item.isFinal) {
-          case 0:
-            item.isFinal = '未开始'
-            break
-          case 1:
-            item.isFinal = '进行中'
-            break
-          case 2:
-            item.isFinal = '截止'
-            break
-          default:
-            item.isFinal = '时间处理中'
-            break
-        }
-      }
+      const works = await getWorks({ classId })
+      const statusMap = { 0: '未开始', 1: '进行中', 2: '截止' }
+      this.TeacherWorkList = works.map((work) => ({
+        ...work,
+        workname: work.workName,
+        modifiedTime: work.startTime,
+        isFinal: work.statusName || statusMap[work.status] || '时间处理中'
+      }))
     },
     async DeleteHomwork(row) {
-      //todo
-      let url = 'http://47.120.78.42:8090/zjgsEmb/TeacherWork/DeleteWork'
-      const res = await axios
-        .delete(url, {
-          params: {
-            workid: row.id
-          }
-        })
-        .then(() => {
-          this.getBasicInfo(this.classId)
-          ElMessage.success('删除成功')
-        })
+      await deleteWork(row.id)
+      ElMessage.success('删除成功')
+      this.getBasicInfo(this.classId)
     },
     async downLoadHomework() {
-      const classId = this.classId
       ElMessage.success('后端处理中请耐心等待')
-      const url = 'http://47.120.78.42:8090/downloadExcel'
       try {
-        const response = await axios
-          .get(url, {
-            params: {
-              classId: this.classId
-            },
-            responseType: 'blob'
-          })
-          .then((res) => {
-            debugger
-            const content = res.data
-            const blob = new Blob([content])
-            const fileName = '班级综合成绩.xls'
-            if ('download' in document.createElement('a')) {
-              // 非IE下载
-              const elink = document.createElement('a')
-              elink.download = fileName
-              elink.style.display = 'none'
-              elink.href = URL.createObjectURL(blob)
-              document.body.appendChild(elink)
-              elink.click()
-              URL.revokeObjectURL(elink.href) // 释放URL 对象
-              document.body.removeChild(elink)
-            } else {
-              // IE10+下载
-              navigator.msSaveBlob(blob, fileName)
-            }
-          })
-        console.log(response)
-        console.log(response.headers)
+        const blob = await exportClassGrades(this.classId)
+        const fileName = '班级综合成绩.xlsx'
+        if ('download' in document.createElement('a')) {
+          // 非IE下载
+          const elink = document.createElement('a')
+          elink.download = fileName
+          elink.style.display = 'none'
+          elink.href = URL.createObjectURL(blob)
+          document.body.appendChild(elink)
+          elink.click()
+          URL.revokeObjectURL(elink.href) // 释放URL 对象
+          document.body.removeChild(elink)
+        } else {
+          // IE10+下载
+          navigator.msSaveBlob(blob, fileName)
+        }
       } catch (error) {
         console.error('Error downloading Excel file:', error)
       }

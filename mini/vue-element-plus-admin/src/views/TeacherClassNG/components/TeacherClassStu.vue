@@ -1,8 +1,8 @@
 <script lang="js">
-import { setup } from 'mockjs'
-import async from 'async'
-import axios from 'axios'
 import { useUserStore } from '@/store/modules/user'
+import { ElMessage } from 'element-plus'
+import { getStudentsByClass } from '@/api/equip/students'
+import { importStudents } from '@/api/equip/imports'
 
 export default {
   props: {
@@ -22,32 +22,14 @@ export default {
   },
   methods: {
     async getstuData() {
-      let url = 'http://47.120.78.42:8090/zjgsEmb/TeacherManageStu/getStuByClass'
-      const res = await axios.get(url, {
-        params: {
-          classId: this.PageClassId
-        }
-      })
-      console.log(res.data)
-      this.stuData = res.data.data
-      console.log(this.stuData)
-      console.log('学生管理界面，班级的id ' + this.PageClassId)
+      this.stuData = await getStudentsByClass(this.PageClassId)
     },
     async uploadMehod(params) {
-      const file = params.file
-      const formData = new FormData()
-      // 添加其他参数到FormData中
-      formData.append('classId', this.PageClassId)
-      formData.append('classType', 2)
-      // 将上传的文件添加到FormData中
-      formData.append('file', file)
       try {
-        let url = 'http://47.120.78.42:8090/zjgsEmb/TeacherManageStu/ImportStu'
-        const res = await axios.post(url, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }, //定义内容格式,很重要
-          timeout: 40000
-        })
-        console.log(res.data)
+        const res = await importStudents(this.PageClassId, params.file)
+        ElMessage.success('导入学生成功')
+        params.onSuccess?.(res)
+        this.getstuData()
       } catch (error) {
         console.error('Error handling preview:', error)
       }

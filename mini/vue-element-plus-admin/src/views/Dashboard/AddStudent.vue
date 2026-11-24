@@ -1,7 +1,7 @@
 <script lang="js">
 import { useUserStore } from '@/store/modules/user'
 import { ElMessage } from 'element-plus'
-import axios from 'axios'
+import { getStudents, createStudent, updateStudent, deleteStudent } from '@/api/equip/students'
 
 export default {
   data() {
@@ -16,7 +16,7 @@ export default {
   },
   created() {
     this.fun = this.$route.query.fun
-    const usrStore = new useUserStore()
+    const usrStore = useUserStore()
     this.StuId = this.$route.query.stuId
     this.classId = usrStore.getClassID
     if (this.fun === 'edit') {
@@ -25,17 +25,15 @@ export default {
   },
   methods: {
     async getInfo() {
-      let url = 'http://47.120.78.42:8090/zjgsEmb/TeacherManageStu/getStuInClass'
-      const res = await axios.get(url, {
-        params: {
-          classId: this.classId,
-          uid: this.StuId
-        }
-      })
-      const data = res.data.data
-      this.className = data.className
+      const students = await getStudents({ classId: this.classId })
+      const data = students.find((item) => String(item.stuId) === String(this.StuId))
+      if (!data) {
+        ElMessage.error('未找到该学生')
+        return
+      }
+      this.className = data.adminClassName || data.className || ''
       this.name = data.stuName
-      this.className = data.className
+      this.college = data.college || ''
     },
     async updateStu() {
       if (this.validateForm()) {
@@ -46,16 +44,14 @@ export default {
         ElMessage.error('学号格式错误')
         return
       }
-      const formData = new FormData()
-      formData.append('ClassName', this.className)
-      formData.append('classId', this.classId)
-      formData.append('college', this.college)
-      formData.append('uid', this.StuId)
-      formData.append('stuName', this.name)
-      let url = 'http://47.120.78.42:8090/zjgsEmb/TeacherManageStu/updateStuInClass'
-      const res = await axios.post(url, formData)
-      console.log(res.data.data)
-      ElMessage.warning(res.data.data)
+      await updateStudent(this.StuId, {
+        stuId: Number(this.StuId),
+        stuName: this.name,
+        college: this.college,
+        adminClassName: this.className,
+        teachingClassName: this.className,
+        classId: this.classId
+      })
       ElMessage.success('更新成功')
     },
     async AddStu() {
@@ -67,15 +63,14 @@ export default {
         ElMessage.error('学号格式错误')
         return
       }
-      const formData = new FormData()
-      formData.append('ClassName', this.className)
-      formData.append('classId', this.classId)
-      formData.append('college', this.college)
-      formData.append('uid', this.StuId)
-      formData.append('stuName', this.name)
-      let url = 'http://47.120.78.42:8090/zjgsEmb/TeacherManageStu/InsertStu'
-      const res = await axios.post(url, formData)
-      console.log(res.data.data)
+      await createStudent({
+        stuId: Number(this.StuId),
+        stuName: this.name,
+        college: this.college,
+        adminClassName: this.className,
+        teachingClassName: this.className,
+        classId: this.classId
+      })
       ElMessage.success('成功')
     },
     validateForm() {
@@ -100,17 +95,8 @@ export default {
       return true // 不是10位的 long 类型
     },
     async deleteStu() {
-      let url = 'http://47.120.78.42:8090/zjgsEmb/TeacherManageStu/deleteClassStudentByStudentId'
-      const res = await axios
-        .get(url, {
-          params: {
-            StuId: this.StuId,
-            classId: this.classId
-          }
-        })
-        .then(() => {
-          ElMessage.warning('删除成功')
-        })
+      await deleteStudent(this.StuId, this.classId)
+      ElMessage.warning('删除成功')
     }
   }
 }

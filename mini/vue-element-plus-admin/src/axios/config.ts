@@ -41,11 +41,13 @@ const defaultResponseInterceptors = (response: AxiosResponse) => {
   } else if (response.data.code === SUCCESS_CODE) {
     return response.data
   } else {
-    ElMessage.error(response?.data?.message)
+    const message = response?.data?.message || '请求失败'
+    ElMessage.error(message)
     if (response?.data?.code === 401) {
       const userStore = useUserStoreWithOut()
       userStore.logout()
     }
+    return Promise.reject(new Error(message))
   }
 }
 

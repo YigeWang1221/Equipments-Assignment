@@ -2,13 +2,9 @@
 // 这里应当使用两个dropdown 下拉菜单的按钮来选择年份和课程类型,再加上一个确认查询的按钮
 // 下面是单拉出来的一个展示列表的框，点击框内的项目就兴建一个界面，title是展示文件的名称，通过叉掉上边框的方式结束观看
 // 如果没有值上传的化默认就是000-all
-import { getyearsList, getGreatWorkList } from '@/apiX/showWorks'
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { ArrowDown } from '@element-plus/icons-vue'
-import async from 'async'
-import axios from 'axios'
 import { useUserStore } from '@/store/modules/user'
+import { getGreatWorks } from '@/api/equip/greatWorks'
 export default {
   data() {
     return {
@@ -21,9 +17,8 @@ export default {
     }
   },
   created() {
-    const usrStore = new useUserStore()
+    const usrStore = useUserStore()
     this.Role = usrStore.getRole
-    console.log(this.Role)
     for (let year = 2024; year <= 2035; year++) {
       this.yearList.push(year)
     }
@@ -50,21 +45,14 @@ export default {
       })
     },
     async getGreatWorkByYearAndType() {
-      let url = 'http://47.120.78.42:8090/zjgsEmb/GreatWork/getSelectedGreatWorks'
-      const res = await axios.get(url, {
-        params: {
-          classType: this.selectedClass,
-          year: this.selectedYear
-        }
-      })
-      console.log(res.data)
-      this.greatWorkList = res.data.data
-      this.greatWorkList.forEach((item) => {
-        if (item.photo && typeof item.photo === 'string') {
-          item.photo = item.photo.substring(1, item.photo.length - 1)
-        }
-      })
-      console.log(this.greatWorkList)
+      const params = {}
+      if (this.selectedYear && this.selectedYear !== 0) {
+        params.year = this.selectedYear
+      }
+      if (this.selectedClass > 0) {
+        params.classType = this.selectedClass
+      }
+      this.greatWorkList = await getGreatWorks(params)
     },
     setClassType1() {
       this.selectedClass = 2
@@ -146,7 +134,7 @@ export default {
         </template>
         <el-image
           @click="ToGreatWork(greatwork)"
-          :src="greatwork.photo ? greatwork.photo : 'src/assets/imgs/Nophoto.jpg'"
+          :src="greatwork.photoUrl ? greatwork.photoUrl : '/src/assets/imgs/NoPhoto.jpg'"
           style="max-width: 100%; max-height: 160px; object-fit: contain"
           :key="fit"
         />

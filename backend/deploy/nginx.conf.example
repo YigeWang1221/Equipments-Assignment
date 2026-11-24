@@ -1,0 +1,39 @@
+server {
+    listen 80;
+    server_name _;
+
+    root /var/www/equip-management/dist;
+    index index.html;
+
+    # Vue Router use hash mode by default; this also supports history mode.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Spring Boot API
+    location /api/ {
+        proxy_pass http://127.0.0.1:8090;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        client_max_body_size 340m;
+    }
+
+    # Uploaded files and video Range requests
+    location /files/ {
+        proxy_pass http://127.0.0.1:8090;
+        proxy_set_header Host $host;
+        proxy_set_header Range $http_range;
+        proxy_set_header If-Range $http_if_range;
+    }
+
+    # WebSocket / SockJS
+    location /ws/ {
+        proxy_pass http://127.0.0.1:8090;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_read_timeout 3600s;
+    }
+}

@@ -1,9 +1,13 @@
 <script lang="js">
-import { onMounted, ref } from 'vue'
-import axios from 'axios'
-import async from 'async'
+import { ref } from 'vue'
 import { useUserStore } from '@/store/modules/user'
 import { ElMessage } from 'element-plus'
+import {
+  getClass,
+  createClass as createClassApi,
+  updateClass as updateClassApi,
+  deleteClass as deleteClassApi
+} from '@/api/equip/classes'
 
 export default {
   data() {
@@ -26,76 +30,51 @@ export default {
   mounted() {},
   created() {
     const userStore = useUserStore()
-    this.PageClassId = userStore.getClassID
-    console.log(this.PageClassId)
-    if (this.PageClassId !== null) {
+    this.PageClassId = userStore.getClassID || ''
+    if (this.PageClassId !== '') {
       this.GetFormData()
     }
   },
   methods: {
     async GetFormData() {
-      console.log('班级编辑组件')
-      console.log(this.PageClassId)
-      let url = 'http://47.120.78.42:8090/zjgsEmb/TeacherClass/getClassById'
-      const res = await axios.get(url, {
-        params: {
-          classId: this.PageClassId
-        }
-      })
-      const classData = res.data.data
+      const classData = await getClass(this.PageClassId)
       this.form.name = classData.className
-      this.form.dateA = classData.modifiedTime
-      this.form.dateB = classData.endTime
+      this.form.dateA = classData.startTime || ''
+      this.form.dateB = classData.endTime || ''
+      this.data1 = classData.startTime || ''
+      this.data2 = classData.endTime || ''
       this.form.year = classData.year
-      console.log(res.data)
       if (classData.classType === 2) {
         this.form.classType = true
       }
     },
-    async updataClass() {
-      const formData = new FormData()
-      formData.append('classId', this.PageClassId)
-      formData.append('className', this.form.name)
-      if (!isNaN(this.form.year)) {
-        formData.append('year', this.form.year)
-      } else {
+    buildClassPayload() {
+      if (isNaN(this.form.year)) {
         ElMessage.warning('年份必须是数字类型的')
-        return
+        return null
       }
-      formData.append('modifiedTime', this.data1)
-      formData.append('endTime', this.data2)
-      if (this.form.classType === true) {
-        formData.append('classType', 2)
-      } else {
-        formData.append('classType', 1)
+      return {
+        className: this.form.name,
+        year: Number(this.form.year),
+        startTime: this.data1 || this.form.dateA,
+        endTime: this.data2 || this.form.dateB,
+        classType: this.form.classType === true ? 2 : 1
       }
-      let url = 'http://47.120.78.42:8090/zjgsEmb/TeacherClass/upDateClassInfo'
-      const res = await axios.post(url, formData)
-      console.log(res.data)
+    },
+    async updataClass() {
+      const payload = this.buildClassPayload()
+      if (!payload) return
+      await updateClassApi(this.PageClassId, payload)
+      ElMessage.success('更新成功')
     },
     async initClass() {
-      const formData = new FormData()
-      formData.append('classId', this.PageClassId)
-      formData.append('className', this.form.name)
-      if (!isNaN(this.form.year)) {
-        formData.append('year', this.form.year)
-      } else {
-        ElMessage.warning('年份必须是数字类型的')
-        return
-      }
-      formData.append('modifiedTime', this.data1)
-      formData.append('endTime', this.data2)
-      if (this.form.classType === true) {
-        formData.append('classType', 2)
-      } else {
-        formData.append('classType', 1)
-      }
-      let url = 'http://47.120.78.42:8090/zjgsEmb/TeacherClass/initClassInfo'
-      const res = await axios.post(url, formData)
+      const payload = this.buildClassPayload()
+      if (!payload) return
+      await createClassApi(payload)
+      ElMessage.success('新建成功')
       this.$router.push({
         path: '/dashboard/IOTclasses'
       })
-      console.log(res.data)
     },
     selectTimeB(val) {
       this.data2 = val
@@ -108,12 +87,8 @@ export default {
       console.log(this.form.dateA)
     },
     async deleteClass() {
-      let url = 'http://47.120.78.42:8090/zjgsEmb/TeacherClass/DeleteClassInfo'
-      const res = await axios.get(url, {
-        params: {
-          classId: this.PageClassId
-        }
-      })
+      await deleteClassApi(this.PageClassId)
+      ElMessage.success('删除成功')
       this.$router.push({
         path: '/dashboard/IOTclasses'
       })

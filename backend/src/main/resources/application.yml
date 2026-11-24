@@ -1,0 +1,82 @@
+server:
+  port: ${SERVER_PORT:8090}
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+    multipart:
+      max-file-size: 320MB
+      max-request-size: 340MB
+
+spring:
+  application:
+    name: equip-management-backend
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${DB_URL:jdbc:mysql://localhost:3306/equip_management?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false}
+    username: ${DB_USERNAME:equip}
+    password: ${DB_PASSWORD:equip123456}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      timeout: 2s
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+    default-property-inclusion: non_null
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.zjgs.equip.**.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:zjgs-equip-management-jwt-secret-key-please-change-in-production-2024}
+    expiration-seconds: ${JWT_EXPIRATION:7200}
+  auth:
+    store: ${AUTH_STORE:memory}
+  storage:
+    type: ${STORAGE_TYPE:local}
+    local-dir: ${STORAGE_LOCAL_DIR:./data/uploads}
+    public-base-url: ${STORAGE_PUBLIC_BASE_URL:http://localhost:8090/files}
+    minio:
+      endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+      access-key: ${MINIO_ACCESS_KEY:minioadmin}
+      secret-key: ${MINIO_SECRET_KEY:minioadmin}
+      bucket: ${MINIO_BUCKET:equip}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4000,http://127.0.0.1:4000,http://localhost:5173}
+  legacy:
+    enabled: false

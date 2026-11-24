@@ -2,8 +2,11 @@
 import { ElDivider, ElMessage } from 'element-plus'
 import { defineComponent } from 'vue'
 import EditorRead from '@/views/Function/EditorRead.vue'
-import axios from 'axios'
-import { VideoPlayer, createVideoViewer } from '@/components/VideoPlayer'
+import { createVideoViewer } from '@/components/VideoPlayer'
+import { getWorkSubmissions, getSubmission, scoreSubmission } from '@/api/equip/submissions'
+import { createGreatWorkFromSubmission } from '@/api/equip/greatWorks'
+import { getWork } from '@/api/equip/works'
+import { getClass } from '@/api/equip/classes'
 
 export default defineComponent({
   components: { EditorRead },
@@ -31,31 +34,17 @@ export default defineComponent({
   },
   methods: {
     async getStuWorkList() {
-      let url = 'http://47.120.78.42:8090/zjgsEmb/TeacherWork/getMiniStuWorkTableById'
-      const res = await axios.get(url, {
-        params: {
-          workId: this.WorkId
-        }
-      })
-      this.stuWorkList = res.data.data
+      this.stuWorkList = await getWorkSubmissions(this.WorkId)
     },
     async getStuWorkItem(row) {
       this.mark = null
-      this.StuWorkId = row.stuWorkId
-      let url = 'http://47.120.78.42:8090/zjgsEmb/TeacherWork/getStuWorkTableByWorkId'
-      const res = await axios.get(url, {
-        params: {
-          StuworkId: row.stuWorkId
-        }
-      })
-      console.log(res.data)
-      const data = res.data.data
-      this.workDoc = res.data.data.workDoc
-      // item.photoUrl = item.photoUrl.substring(1, item.photoUrl.length - 1)
+      this.StuWorkId = row.id
+      const data = await getSubmission(row.id)
+      this.workDoc = data.workDoc || ''
       this.zip = ''
       this.VideoUrl = ''
-      this.VideoUrl = data.video.substring(1, data.video.length - 1)
-      this.zip = data.zip.substring(1, data.zip.length - 1)
+      this.VideoUrl = data.videoUrl || ''
+      this.zip = data.zipUrl || ''
       this.StuWorkItem = data
     },
     downLoadZip() {
@@ -75,26 +64,25 @@ export default defineComponent({
         return
       }
       console.log(this.VideoUrl)
-      createVideoViewer({
-        url: this.VideoUrl,
-        poster: 'http://47.120.78.42:9001/files/2024/04/21/9a92b636e5a94d87a0da8607773beee8.png'
-      })
+      createVideoViewer({ url: this.VideoUrl })
     },
     async updateScore() {
       console.log('this.stuWorkId ' + this.StuWorkId)
       if (this.StuWorkId === '') {
         ElMessage.error('请先选择一份作业')
+        return
       }
-      if (this.mark !== '' && !isNaN(this.mark) && this.mark >= 0 && this.mark <= 100) {
-        let markFloat = parseFloat(this.mark)
-        let url =
-          'http://47.120.78.42:8090/zjgsEmb/TeacherWork/CorrectHomeWork?StuWorkId=' +
-          this.StuWorkId +
-          '&mark=' +
-          this.mark
-        const res = await axios.post(url).then(() => {
-          this.getStuWorkList()
-        })
+      if (
+        this.mark !== '' &&
+        this.mark !== null &&
+        !isNaN(this.mark) &&
+        this.mark >= 0 &&
+        this.mark <= 100
+      ) {
+        const markFloat = parseFloat(this.mark)
+        await scoreSubmission(this.StuWorkId, markFloat)
+        ElMessage.success('分数提交成功')
+        this.getStuWorkList()
       } else {
         ElMessage.error('分数的类型错误，重新输入提交')
       }
@@ -102,18 +90,21 @@ export default defineComponent({
     async setGreatWork() {
       if (this.StuWorkId === '') {
         ElMessage.error('请先选择一份作业')
-      }
-      let url = 'http://47.120.78.42:8090/zjgsEmb/GreatWork/setGreatWorkByStuWorkId'
-      const formData = new FormData()
-      formData.append('StuWorkId', this.StuWorkId)
-      formData.append('workName', this.workname)
-      const res = await axios.post(url, formData)
-      console.log(res.data)
-      if (res.data.state === 300) {
-        ElMessage.error('请不要对一份作业重复创建优秀作业')
         return
       }
-      ElMessage.success('设置成功，你可以在优秀作业展示面板对作业进行编辑')
+      try {
+        const work = await getWork(this.WorkId)
+        const classInfo = await getClass(work.classId)
+        await createGreatWorkFromSubmission(this.StuWorkId, {
+          workName: this.workname,
+          photoUrl: '',
+          classType: classInfo.classType,
+          year: classInfo.year
+        })
+        ElMessage.success('设置成功，你可以在优秀作业展示面板对作业进行编辑')
+      } catch (error) {
+        console.error('设置优秀作业失败', error)
+      }
     }
   }
 })
@@ -166,7 +157,7 @@ export default defineComponent({
       ><el-input
         v-model="mark"
         style="width: 240px"
-        :placeholder="'输入分数1-100 当前分数 ' + StuWorkItem.mark"
+        :placeholder="'输入分数1-100 当前分数 ' + StuWorkItem.score"
     /></el-col>
     <el-col :span="3"><el-button type="primary" @click="updateScore">提交分数</el-button> </el-col>
     <el-col :span="3"

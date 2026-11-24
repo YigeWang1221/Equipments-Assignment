@@ -23,8 +23,9 @@
       <!--      这里用upload上传图片 上传方法使用自己的upload(file)，返回值是res{code，url}-->
       <el-upload
         class="avatar-uploader"
-        action="http://47.120.78.42:8090/upload"
+        action="#"
         :show-file-list="false"
+        :http-request="uploadPhoto"
         :on-success="getPhotoRes"
         :before-upload="PhotoJudge"
         :limit="1"
@@ -38,8 +39,9 @@
       <el-upload
         v-model:file-list="fileList"
         class="upload-demo"
-        action="http://47.120.78.42:8090/upload"
+        action="#"
         multiple
+        :http-request="uploadZip"
         :before-upload="ZipJudge"
         :on-success="getZipRes"
         :on-preview="handlePreview"
@@ -63,12 +65,16 @@
 
 <!--记得换成js-->
 <script lang="js">
-import { reactive, ref } from 'vue'
+import { ref } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
-import axios from 'axios'
 import { ElMessage } from 'element-plus'
-import { reject } from 'lodash-es'
-import async from 'async'
+import {
+  getEquipment,
+  createEquipment,
+  updateEquipment,
+  deleteEquipment
+} from '@/api/equip/equipments'
+import { uploadFile } from '@/api/equip/files'
 //传入这个界面的变量有两个，一个是 routerParam 区别add/editor 另一个是equipment
 export default {
   data() {
@@ -93,20 +99,13 @@ export default {
     }
   },
   methods: {
-    async getEquipById(id) {
-      let url = 'http://47.120.78.42:8090/zjgsEmb/EquipMent/getEquipmentById'
-      const res = await axios.get(url, {
-        params: {
-          id: this.EquipId
-        }
-      })
-      console.log(res)
-      const dataX = res.data.data
+    async getEquipById() {
+      const dataX = await getEquipment(this.EquipId)
       this.form.name = dataX.name
-      this.form.photoUrl = dataX.photoUrl.substring(1, dataX.photoUrl.length - 1)
-      // console.log(dataX.photoUrl)
-      this.form.number = dataX.number
-      this.used = dataX.used
+      this.form.photoUrl = dataX.photoUrl || ''
+      this.form.number = dataX.totalNumber
+      this.form.infoUrl = dataX.infoUrl || null
+      this.used = dataX.usedNumber
       this.EquipId = dataX.id
       this.imageUrl = dataX.photoUrl
     },
@@ -158,63 +157,63 @@ export default {
       }
     },
     getZipRes(res) {
-      this.form.infoUrl = JSON.stringify(res)
-      console.log(this.form.infoUrl)
+      this.form.infoUrl = res?.url || ''
     },
     getPhotoRes(res) {
-      this.imageUrl = JSON.stringify(res)
-      this.form.photoUrl = JSON.stringify(res)
-      console.log('getPhotoRes' + this.imageUrl)
+      this.imageUrl = res?.url || ''
+      this.form.photoUrl = res?.url || ''
+    },
+    async doUpload(params, apply) {
+      try {
+        const file = await uploadFile(params.file)
+        apply(file.url)
+        params.onSuccess?.(file)
+      } catch (error) {
+        console.error(error)
+      }
+    },
+    uploadPhoto(params) {
+      return this.doUpload(params, (url) => {
+        this.imageUrl = url
+        this.form.photoUrl = url
+      })
+    },
+    uploadZip(params) {
+      return this.doUpload(params, (url) => {
+        this.form.infoUrl = url
+      })
+    },
+    validateEquipment() {
+      if (!this.form.name || this.form.number === null || this.form.number === '') {
+        ElMessage({
+          message: '名字和数量不能为空',
+          grouping: true,
+          type: 'warning'
+        })
+        return false
+      }
+      return true
+    },
+    buildEquipmentPayload() {
+      return {
+        name: this.form.name,
+        photoUrl: this.imageUrl || this.form.photoUrl || '',
+        infoUrl: this.form.infoUrl || '',
+        totalNumber: Number(this.form.number)
+      }
     },
     async uploadAllInfo() {
+      if (!this.validateEquipment()) return
+      const payload = this.buildEquipmentPayload()
       if (this.fun === 'edit') {
-        console.log(this.fun)
-        if (this.form.name === null || this.form.number === null) {
-          ElMessage({
-            message: '名字和数量不能为空',
-            grouping: true,
-            type: 'warning'
-          })
-          return
-        }
-        //上传的代码
-        const formData = new FormData()
-        if (this.form.infoUrl !== null) {
-          formData.append('infoUrl', this.form.infoUrl)
-        }
-
-        formData.append('photoUrl', this.imageUrl)
-        console.log(this.imageUrl)
-        formData.append('number', this.form.number)
-        formData.append('id', this.EquipId)
-        formData.append('name', this.form.name)
-        formData.append('used', 0)
-        let url = 'http://47.120.78.42:8090/zjgsEmb/EquipMent/updateEquip'
-        const res = await axios.post(url, formData)
-        ElMessage.warning(res.data.data)
+        await updateEquipment(this.EquipId, payload)
+        ElMessage.success('更新成功')
         this.$router.push({
           path: '/guide/index'
         })
       }
       if (this.fun === 'add' || this.fun === null) {
-        console.log(this.fun)
-        if (this.form.name === null || this.form.number === null) {
-          ElMessage({
-            message: '名字和数量不能为空',
-            grouping: true,
-            type: 'warning'
-          })
-          return
-        }
-        //上传的代码
-        const formData = new FormData()
-        formData.append('infoUrl', this.form.infoUrl)
-        formData.append('photoUrl', this.imageUrl)
-        formData.append('number', this.form.number)
-        formData.append('name', this.form.name)
-        formData.append('used', 0)
-        let url = 'http://47.120.78.42:8090/zjgsEmb/EquipMent/initEquipment'
-        const res = await axios.post(url, formData)
+        await createEquipment(payload)
         ElMessage({
           message: '新建成功',
           grouping: true,
@@ -223,14 +222,8 @@ export default {
       }
     },
     async DeleteEquip() {
-      let url = 'http://47.120.78.42:8090/zjgsEmb/EquipMent/deleteEquipmentById'
-      const res = await axios.get(url, {
-        params: {
-          id: this.EquipId
-        }
-      })
+      await deleteEquipment(this.EquipId)
       ElMessage.success('删除成功')
-      console.log(res.data)
       this.$router.push({
         path: '/guide/index'
       })
