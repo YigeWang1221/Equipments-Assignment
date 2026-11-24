@@ -1,118 +1,91 @@
 <script>
-import { getWorkLists } from '@/apiX/homeWork'
 import { useUserStore } from '@/store/modules/user'
-import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import { getMyClass, getMyGroup, getStudentClass, getStudentGroup } from '@/api/equip/students'
+import { getWorks } from '@/api/equip/works'
+import { getMySubmission } from '@/api/equip/submissions'
 export default {
   data() {
     return {
       stuId: '',
       groupId: '',
+      classId: '',
       className: '',
       ClassWorkList: [],
       FinalClassWOrkList: []
     }
   },
   created() {
-    const usrStore = new useUserStore()
+    const usrStore = useUserStore()
     this.stuId = usrStore.getStuId
     this.getGroupIdNow()
     this.getBasicInfo()
     this.getBasicInfo2()
   },
   methods: {
-    async getBasicInfo() {
-      let url0 = 'http://47.120.78.42:8090/Usr/getClassIdByStuId'
-      let url1 = 'http://47.120.78.42:8090/zjgsEmb/TeacherClass/getClassById'
-      let url2 = 'http://47.120.78.42:8090/zjgsEmb/TeacherWork/getTeacherWorkByClassIdNotFinal'
-
-      const res0 = await axios.get(url0, {
-        params: {
-          StuId: this.stuId
-        }
-      })
-      const classId = res0.data.data
-      const res1 = await axios.get(url1, {
-        params: {
-          classId: classId
-        }
-      })
-      console.log('网络请求2 ' + res1)
-      this.className = res1.data.data.className
-
-      const res2 = await axios.get(url2, {
-        params: {
-          classId: classId
-        }
-      })
-      this.ClassWorkList = res2.data.data
-      for (let i = 0; i < this.ClassWorkList.length; i++) {
-        const item = this.ClassWorkList[i]
-        switch (item.isFinal) {
-          case 0:
-            item.isFinal = '未开始'
-            break
-          case 1:
-            item.isFinal = '进行中'
-            break
-          case 2:
-            item.isFinal = '截止'
-            break
-          default:
-            item.isFinal = '时间处理中'
-            break
-        }
+    normalizeWork(work) {
+      const statusMap = { 0: '未开始', 1: '进行中', 2: '截止' }
+      return {
+        ...work,
+        workname: work.workName,
+        modifiedTime: work.startTime,
+        finishTime: work.endTime,
+        detailurl: work.detailUrl,
+        isFinal: work.statusName || statusMap[work.status] || '时间处理中'
       }
+    },
+    async getClassInfo() {
+      try {
+        const classInfo = this.stuId ? await getStudentClass(this.stuId) : await getMyClass()
+        this.classId = classInfo.id
+        this.className = classInfo.className
+        return classInfo
+      } catch (error) {
+        console.error('获取学生班级失败', error)
+        return null
+      }
+    },
+    async getBasicInfo() {
+      const classInfo = await this.getClassInfo()
+      if (!classInfo) return
+      const works = await getWorks({ classId: classInfo.id })
+      this.ClassWorkList = works
+        .filter((work) => work.status !== 2)
+        .map((work) => this.normalizeWork(work))
     },
     async getBasicInfo2() {
-      let url0 = 'http://47.120.78.42:8090/Usr/getClassIdByStuId'
-      let url1 = 'http://47.120.78.42:8090/zjgsEmb/TeacherClass/getClassById'
-      let url2 =
-        'http://47.120.78.42:8090/zjgsEmb/TeacherWork/getTeacherWorkByClassIdANDGroupIdIsFinal'
-
-      const res0 = await axios.get(url0, {
-        params: {
-          StuId: this.stuId
-        }
-      })
-      const classId = res0.data.data
-      const res1 = await axios.get(url1, {
-        params: {
-          classId: classId
-        }
-      })
-      console.log('网络请求2 ' + res1)
-      this.className = res1.data.data.className
-
-      const res2 = await axios.get(url2, {
-        params: {
-          classId: classId,
-          groupId: this.groupId
-        }
-      })
-      this.FinalClassWOrkList = res2.data.data
-      for (let i = 0; i < this.FinalClassWOrkList.length; i++) {
-        const item = this.FinalClassWOrkList[i]
-        switch (item.score) {
-          case null:
+      const classInfo = await this.getClassInfo()
+      if (!classInfo) return
+      const works = await getWorks({ classId: classInfo.id, status: 2 })
+      const list = works.filter((work) => work.status === 2).map((work) => this.normalizeWork(work))
+      this.FinalClassWOrkList = await Promise.all(
+        list.map(async (item) => {
+          if (!item.groupSubmitted) {
             item.score = '教师尚未批改'
-            break
-          case -1:
-            item.score = '作业未写'
-            break
-          default:
-            break
-        }
-      }
+            return item
+          }
+          try {
+            const submission = await getMySubmission(item.id)
+            if (submission?.score !== null && submission?.score !== undefined) {
+              item.score = submission.score
+            } else {
+              item.score = '教师尚未批改'
+            }
+          } catch (error) {
+            item.score = '教师尚未批改'
+          }
+          return item
+        })
+      )
     },
     async getGroupIdNow() {
-      let url = 'http://47.120.78.42:8090/Usr/getGroupIdBystuId'
-      const res = await axios.get(url, {
-        params: {
-          StuId: this.stuId
-        }
-      })
-      this.groupId = res.data.data
+      try {
+        const group = this.stuId ? await getStudentGroup(this.stuId) : await getMyGroup()
+        this.groupId = group?.id || 0
+      } catch (error) {
+        console.error('获取学生小组失败', error)
+        this.groupId = 0
+      }
       if (this.groupId === 0) {
         ElMessage.error('你尚未加入班级小组，请联系傅均老师处理')
         setTimeout(() => {
@@ -123,14 +96,13 @@ export default {
       }
     },
     downLoadZip(row) {
-      if (row.detailurl === null || row.detailurl === '') {
+      if (row.detailurl === null || row.detailurl === undefined || row.detailurl === '') {
         ElMessage.warning('当前作业没有对应资源可供下载')
         return
       }
       const link = document.createElement('a')
-      const zipUrl = row.detailurl.substring(1, row.detailurl.length - 1)
-      link.href = zipUrl
-      link.setAttribute('download', zipUrl)
+      link.href = row.detailurl
+      link.setAttribute('download', row.detailurl)
       link.click()
     },
     FinishHomeWork(row) {

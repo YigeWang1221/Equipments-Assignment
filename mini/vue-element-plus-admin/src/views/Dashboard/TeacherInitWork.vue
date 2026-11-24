@@ -3,7 +3,8 @@
 import MyEditor from '@/views/Dashboard/components/MyEditor.vue'
 import { useUserStore } from '@/store/modules/user'
 import { ElMessage } from 'element-plus'
-import axios from 'axios'
+import { getWork, createWork, updateWork } from '@/api/equip/works'
+import { uploadFile } from '@/api/equip/files'
 export default {
   components: { MyEditor },
   data() {
@@ -17,11 +18,12 @@ export default {
       date1: '',
       date2: '',
       workDoc: '',
+      contentJson: '',
       fun: ''
     }
   },
   created() {
-    const usrStore = new useUserStore()
+    const usrStore = useUserStore()
     this.PageClassId = usrStore.getClassID
     console.log('跳转到新建作业界面 classId(this.PageClassId)' + this.PageClassId)
     this.fun = this.$route.query.fun
@@ -34,22 +36,16 @@ export default {
   },
   methods: {
     async initPageUpdateFun() {
-      let url = 'http://47.120.78.42:8090/zjgsEmb/TeacherWork/getTeacherWorkByWorkId'
-      const res = await axios.get(url, {
-        params: {
-          workid: this.workId
-        }
-      })
-      const data = res.data.data
-      this.editorValue = data.model
-      this.date1 = res.data.data.modifiedTime
-      this.date2 = data.endTime
-      console.log(data.endTime)
-      // console.log(this.date2)
-      this.workName = data.workname
+      const data = await getWork(this.workId)
+      this.editorValue = data.contentHtml || ''
+      this.contentJson = data.contentJson || ''
+      this.date1 = (data.startTime || '').slice(0, 10)
+      this.date2 = (data.endTime || '').slice(0, 10)
+      this.workName = data.workName || ''
+      this.infoUrl = data.detailUrl || ''
     },
     getUrlRes(res) {
-      this.PhotoUrl = JSON.stringify(res)
+      this.PhotoUrl = res?.url || ''
     },
     handlePreview1(uploadFile) {
       const allowedExtensions = ['jpg', 'jpeg', 'png', 'webp']
@@ -99,16 +95,48 @@ export default {
       }
     },
     getUrlResZip(res) {
-      this.infoUrl = JSON.stringify(res)
+      this.infoUrl = res?.url || ''
+    },
+    async uploadImg(params) {
+      try {
+        const file = await uploadFile(params.file)
+        this.PhotoUrl = file.url
+        params.onSuccess?.(file)
+      } catch (error) {
+        console.error(error)
+      }
+    },
+    async uploadZip(params) {
+      try {
+        const file = await uploadFile(params.file)
+        this.infoUrl = file.url
+        params.onSuccess?.(file)
+      } catch (error) {
+        console.error(error)
+      }
+    },
+    beforeRemove() {
+      // 允许移除已选择的文件
+      return true
+    },
+    selectTimeA(val) {
+      this.date1 = val
+    },
+    selectTimeB(val) {
+      this.date2 = val
+    },
+    buildWorkPayload() {
+      return {
+        classId: Number(this.PageClassId),
+        workName: this.workName,
+        contentHtml: this.editorValue,
+        contentJson: this.contentJson,
+        detailUrl: this.infoUrl,
+        startTime: this.date1,
+        endTime: this.date2
+      }
     },
     async initWork() {
-      const formData = new FormData()
-      formData.append('classid', this.PageClassId)
-      formData.append('modifiedTime', this.date1)
-      formData.append('endTime', this.date2)
-      formData.append('workname', this.workName)
-      formData.append('model', this.editorValue)
-      formData.append('detailurl', this.infoUrl)
       if (this.workName === '') {
         ElMessage.error('必须设置作业名称')
         return
@@ -117,50 +145,26 @@ export default {
         ElMessage.error('必须设置起止日期')
         return
       }
-      console.log(formData)
-      console.log(this.date1)
-      console.log(this.data2)
-      let url = 'http://47.120.78.42:8090/zjgsEmb/TeacherWork/post/initWork'
-      const res = await axios.post(url, formData)
-      console.log(res.data)
-      if (res.data.state === 200) {
-        let url1 = 'http://47.120.78.42:8090/test/dailySchedule'
-        await axios.post(url1)
-        ElMessage.success('新建作业成功')
-        this.$router.push({
-          path: '/dashboard/analysis',
-          query: {
-            id: this.PageClassId,
-            funL: 'basic'
-          }
-        })
-      }
+      await createWork(this.buildWorkPayload())
+      ElMessage.success('新建作业成功')
+      this.$router.push({
+        path: '/dashboard/analysis',
+        query: {
+          id: this.PageClassId,
+          funL: 'basic'
+        }
+      })
     },
     async updateWork() {
-      const formData = new FormData()
-      formData.append('classid', this.PageClassId)
-      formData.append('modifiedTime', this.date1)
-      formData.append('endTime', this.date2)
-      formData.append('workname', this.workName)
-      formData.append('model', this.editorValue)
-      formData.append('detailurl', this.infoUrl)
-      formData.append('id', this.workId)
-      let url = 'http://47.120.78.42:8090/zjgsEmb/TeacherWork/post/upDateWork'
-      const res = await axios.post(url, formData)
-      console.log(res)
-      console.log('this.PageClassId ' + this.PageClassId)
-      if (res.data.state === 200) {
-        let url1 = 'http://47.120.78.42:8090/test/dailySchedule'
-        await axios.post(url1)
-        ElMessage.success('更新作业内容成功')
-        this.$router.push({
-          path: '/dashboard/analysis',
-          query: {
-            id: this.PageClassId,
-            funL: 'basic'
-          }
-        })
-      }
+      await updateWork(this.workId, this.buildWorkPayload())
+      ElMessage.success('更新作业内容成功')
+      this.$router.push({
+        path: '/dashboard/analysis',
+        query: {
+          id: this.PageClassId,
+          funL: 'basic'
+        }
+      })
     }
   }
 }
@@ -202,9 +206,9 @@ export default {
   <el-upload
     style="margin-top: 10px"
     class="upload-demo"
-    action="http://47.120.78.42:8090/upload"
+    action="#"
     multiple
-    :http-request="uploadMehod"
+    :http-request="uploadZip"
     :before-upload="handlePreview2"
     :on-success="getUrlResZip"
     :before-remove="beforeRemove"
@@ -218,9 +222,9 @@ export default {
   <el-upload
     style="margin-top: 10px"
     class="upload-demo"
-    action="http://47.120.78.42:8090/upload"
+    action="#"
     multiple
-    :http-request="uploadMehod"
+    :http-request="uploadImg"
     :before-upload="handlePreview1"
     :on-success="getUrlRes"
     :before-remove="beforeRemove"

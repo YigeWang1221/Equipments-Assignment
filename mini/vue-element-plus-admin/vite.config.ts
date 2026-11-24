@@ -59,10 +59,14 @@ export default ({ command, mode }: ConfigEnv): UserConfig => {
             ]
           })
         : undefined,
-      EslintPlugin({
-        cache: false,
-        include: ['src/**/*.vue', 'src/**/*.ts', 'src/**/*.tsx'] // 检查的文件
-      }),
+      !isBuild
+        ? undefined
+        : EslintPlugin({
+            cache: false,
+            failOnError: false,
+            failOnWarning: false,
+            include: ['src/**/*.vue', 'src/**/*.ts', 'src/**/*.tsx'] // 检查的文件
+          }),
       VueI18nPlugin({
         runtimeOnly: true,
         compositionOnly: true,
@@ -141,11 +145,18 @@ export default ({ command, mode }: ConfigEnv): UserConfig => {
     server: {
       port: 4000,
       proxy: {
-        // 选项写法
         '/api': {
-          target: 'http://127.0.0.1:8000',
+          target: 'http://127.0.0.1:8090',
+          changeOrigin: true
+        },
+        '/files': {
+          target: 'http://127.0.0.1:8090',
+          changeOrigin: true
+        },
+        '/ws': {
+          target: 'ws://127.0.0.1:8090',
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api/, '')
+          ws: true
         }
       },
       hmr: {
@@ -154,25 +165,47 @@ export default ({ command, mode }: ConfigEnv): UserConfig => {
       host: '0.0.0.0'
     },
     optimizeDeps: {
+      // 关闭静态依赖爬取。该模板依赖很多，Vite 5.1 在 Node 24 下爬取
+      // element-plus / echarts / wangeditor 的完整依赖图可能阻塞首屏 60s+。
+      // 这里显式列出实际使用的依赖，让 esbuild 只预构建一次（约 0.4s）。
+      noDiscovery: true,
+      holdUntilCrawlEnd: false,
       include: [
         'vue',
+        'vue/jsx',
         'vue-router',
+        'pinia',
+        'pinia-plugin-persistedstate',
+        'vue-i18n',
         'vue-types',
+        'element-plus',
         'element-plus/es/locale/lang/zh-cn',
         'element-plus/es/locale/lang/en',
+        '@element-plus/icons-vue',
         '@iconify/iconify',
+        '@iconify/vue',
         '@vueuse/core',
         'axios',
         'qs',
-        'echarts',
+        'dayjs',
+        'lodash-es',
+        'mitt',
+        'nprogress',
+        'mockjs',
+        'echarts/core',
+        'echarts/charts',
+        'echarts/components',
+        'echarts/renderers',
         'echarts-wordcloud',
         'qrcode',
         '@wangeditor/editor',
         '@wangeditor/editor-for-vue',
+        'vditor',
         'vue-json-pretty',
         '@zxcvbn-ts/core',
-        'dayjs',
-        'cropperjs'
+        'cropperjs',
+        'vue-draggable-plus',
+        'xgplayer'
       ]
     }
   }

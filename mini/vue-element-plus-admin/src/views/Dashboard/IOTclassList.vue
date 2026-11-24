@@ -1,6 +1,6 @@
 <script lang="js">
 // 教师查看班级列表的界面 IOT页面
-import axios from 'axios'
+import { getClasses } from '@/api/equip/classes'
 
 export default {
   data() {
@@ -14,12 +14,7 @@ export default {
   methods: {
     async getLearningClasses() {
       try {
-        // 模拟异步请求获取课程列表数据
-        let url = 'http://47.120.78.42:8090/zjgsEmb/TeacherClass/getAllIOTClass'
-        const res = await axios.get(url)
-        const data = res.data
-        console.log(data)
-        this.learningClasses = data.data // 将获取到的课程列表数据赋值给 learningClasses
+        this.learningClasses = await getClasses({ type: 'IOT' })
       } catch (error) {
         console.error('Error fetching learning classes:', error)
       }
@@ -59,7 +54,7 @@ export default {
       class="card-item"
       style="width: 460px"
       shadow="hover"
-      @click="JumpToClass(classItem.classId, classItem.className)"
+      @click="JumpToClass(classItem.id, classItem.className)"
     >
       {{ classItem.className }}
     </el-card>

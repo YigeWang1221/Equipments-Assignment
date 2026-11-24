@@ -1,5 +1,7 @@
 <script lang="js">
 // 教师查看班级列表的界面 IOT页面
+import { getClasses } from '@/api/equip/classes'
+
 export default {
   data() {
     return {
@@ -12,10 +14,7 @@ export default {
   methods: {
     async getLearningClasses() {
       try {
-        // 模拟异步请求获取课程列表数据
-        const res = await fetch('your_api_endpoint')
-        const data = await res.json()
-        this.learningClasses = data.data // 将获取到的课程列表数据赋值给 learningClasses
+        this.learningClasses = await getClasses({ type: 'IOT' })
       } catch (error) {
         console.error('Error fetching learning classes:', error)
       }

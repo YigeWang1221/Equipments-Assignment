@@ -6,6 +6,7 @@ import { propTypes } from '@/utils/propTypes'
 import { isNumber } from '@/utils/is'
 import { ElMessage } from 'element-plus'
 import { useLocaleStore } from '@/store/modules/locale'
+import { uploadFile } from '@/api/equip/files'
 
 const localeStore = useLocaleStore()
 
@@ -113,21 +114,9 @@ defineExpose({ getEditorRef })
 
 // 自定义图片上传方法
 const customUploadImg = async (files: FileList) => {
-  const formData = new FormData()
-  formData.append('file', files[0])
-
   try {
-    const response = await fetch('http://47.120.78.42:8090/upload', {
-      method: 'POST',
-      body: formData
-    })
-
-    if (response.ok) {
-      const data = await response.json()
-      return data.url // 返回图片链接
-    } else {
-      throw new Error('上传图片失败')
-    }
+    const file = await uploadFile(files[0])
+    return file.url // 返回图片链接
   } catch (error) {
     console.error(error)
     ElMessage.error('上传图片失败')

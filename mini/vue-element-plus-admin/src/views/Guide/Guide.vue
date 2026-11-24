@@ -22,12 +22,9 @@
 // 点击器材的时候需要根据permission来判断是进入借用详情还是 修改详情（就是下一个界面的可修改和可见改成false）
 // 需要展示的是 图片，总数和剩余数量
 // 回去看一下逻辑是个人借用还是小组借用
-import { onMounted, ref } from 'vue'
-import path from 'path'
-import { useRouter } from 'vue-router'
-import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/store/modules/user'
+import { getEquipments } from '@/api/equip/equipments'
 
 export default {
   data() {
@@ -46,20 +43,7 @@ export default {
   },
   methods: {
     async getEquipList() {
-      let url = 'http://47.120.78.42:8090/zjgsEmb/EquipMent/getAllEquipment'
-      const res = await axios.get(url)
-      this.equipments = res.data.data
-      this.equipments.forEach((item) => {
-        // 对每个对象的 photoUrl 属性进行操作
-        if (item.photoUrl !== null) {
-          item.photoUrl = item.photoUrl.substring(1, item.photoUrl.length - 1)
-        }
-        if (item.infoUrl !== null) {
-          item.infoUrl = item.infoUrl.substring(1, item.infoUrl.length - 1)
-        }
-      })
-      console.log('this.equipment')
-      console.log(this.equipments)
+      this.equipments = await getEquipments()
     },
     ToAddEquipment() {
       console.log('跳转到编辑界面')
@@ -115,16 +99,12 @@ export default {
         <template #header>{{ equipment.name }}</template>
         <!--        如果为空就显示本地的-->
         <el-image
-          :src="equipment.photoUrl ? equipment.photoUrl : 'src/assets/imgs/Nophoto.jpg'"
+          :src="equipment.photoUrl ? equipment.photoUrl : '/src/assets/imgs/NoPhoto.jpg'"
           style="max-width: 200px; max-height: 280px; object-fit: contain"
         />
         <template #footer>
-          <el-text type="danger">现有数量：{{ equipment.number }}</el-text>
-          <el-button
-            v-if="equipment.infoUrl !== 'ul'"
-            link
-            type="success"
-            @click="downLoadZip(equipment)"
+          <el-text type="danger">现有数量：{{ equipment.availableNumber }}</el-text>
+          <el-button v-if="equipment.infoUrl" link type="success" @click="downLoadZip(equipment)"
             >下载配套资源</el-button
           >
           <div>
@@ -144,7 +124,7 @@ export default {
     </div>
     <el-card style="max-width: 200px" shadow="hover" v-if="role === 'Teacher'">
       <template #header>新增器材</template>
-      <el-image src="src/assets/imgs/NoPhoto.jpg" style="max-width: 100%; max-height: 280px" />
+      <el-image src="/src/assets/imgs/NoPhoto.jpg" style="max-width: 100%; max-height: 280px" />
       <template #footer>
         <el-button link type="warning" @click="ToAddEquipment">点击增加</el-button>
       </template>

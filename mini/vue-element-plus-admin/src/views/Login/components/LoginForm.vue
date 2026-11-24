@@ -13,9 +13,9 @@ import { UserType } from '@/api/login/types'
 // import { useValidator } from '@/hooks/web/useValidator'
 import { useUserStore } from '@/store/modules/user'
 import { BaseButton } from '@/components/Button'
-import { getGuestRoleApi, getTeacherRoleApi } from '@/apiX/login'
-import axios from 'axios'
-import { getStudentRoleApi } from '@/apiX/login'
+import { getGuestRoleApi, getTeacherRoleApi, getStudentRoleApi } from '@/apiX/login'
+import { loginApi } from '@/api/equip/auth'
+import type { BackendRole } from '@/api/equip/types'
 
 const emit = defineEmits(['to-register'])
 
@@ -168,15 +168,10 @@ const signIn = async () => {
       loading.value = true
       const formData = await getFormData<UserType>()
       try {
-        let url = 'http://47.120.78.42:8090/Usr/logIn'
-        let result = await axios.get(url, {
-          params: {
-            username: formData.username,
-            password: formData.password
-          }
+        const result = await loginApi({
+          username: formData.username,
+          password: formData.password
         })
-        console.log(result)
-        console.log(result.data.data[0])
         if (result) {
           // 是否记住我
           if (unref(remember)) {
@@ -188,10 +183,27 @@ const signIn = async () => {
             userStore.setLoginInfo(undefined)
           }
           userStore.setRememberMe(unref(remember))
-          userStore.setUserInfo(result.data.data)
+          userStore.setToken(result.token)
+          const backendUser = result.user
+          const roleMap: Record<BackendRole, string> = {
+            TEACHER: 'Teacher',
+            STUDENT: 'Student',
+            GUEST: 'Guest'
+          }
+          const role = roleMap[backendUser.role] || 'Guest'
+          const userInfo: UserType = {
+            username: backendUser.username || formData.username,
+            password: '',
+            role,
+            roleId: String(backendUser.id ?? '')
+          }
+          userStore.setUserInfo(userInfo)
+          userStore.setRole(role)
+          userStore.setClassId(backendUser.classId ?? undefined)
+          userStore.setStuId(backendUser.stuId ?? undefined)
           // 是否使用动态路由
           if (appStore.getDynamicRouter) {
-            getRole(result.data.data[0], parseInt(formData.username))
+            await getRole(role, backendUser.stuId ?? undefined)
           } else {
             await permissionStore.generateRoutes('static').catch(() => {})
             permissionStore.getAddRouters.forEach((route) => {
@@ -201,6 +213,8 @@ const signIn = async () => {
             push({ path: redirect.value || permissionStore.addRouters[0].path })
           }
         }
+      } catch (error) {
+        console.error('登录失败', error)
       } finally {
         loading.value = false
       }
@@ -209,12 +223,12 @@ const signIn = async () => {
 }
 
 // 获取角色信息
-const getRole = async (param: string, stuId: number) => {
+const getRole = async (param: string, stuId?: number) => {
   const formData = await getFormData<UserType>()
   const params = {
     roleName: formData.username
   }
-  if (param === 'Teacher') {
+  if (param === 'Teacher' || param === 'TEACHER') {
     userStore.setRole('Teacher')
     console.log('userStore.role: ' + userStore.getRole)
     const res =
@@ -235,7 +249,7 @@ const getRole = async (param: string, stuId: number) => {
       push({ path: redirect.value || permissionStore.addRouters[0].path })
     }
   }
-  if (param === 'Stu') {
+  if (param === 'Student' || param === 'Stu' || param === 'STUDENT') {
     userStore.setRole('Student')
     userStore.setStuId(stuId)
     const res =
@@ -256,7 +270,7 @@ const getRole = async (param: string, stuId: number) => {
       push({ path: redirect.value || permissionStore.addRouters[0].path })
     }
   }
-  if (param === 'Guest') {
+  if (param === 'Guest' || param === 'GUEST') {
     userStore.setRole('Guest')
     userStore.setStuId(stuId)
     const res =

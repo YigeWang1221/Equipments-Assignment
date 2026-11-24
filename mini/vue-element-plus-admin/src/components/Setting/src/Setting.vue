@@ -4,7 +4,6 @@
 // import { useI18n } from '@/hooks/web/useI18n'
 // import { ThemeSwitch } from '@/components/ThemeSwitch'
 // import { useCssVar } from '@vueuse/core'
-import { useAppStore } from '@/store/modules/app'
 // import { trim, setCssVar, getCssVar } from '@/utils'
 // import ColorRadioPicker from './components/ColorRadioPicker.vue'
 // import InterfaceDisplay from './components/InterfaceDisplay.vue'
@@ -19,8 +18,6 @@ import { useAppStore } from '@/store/modules/app'
 // const { getPrefixCls } = useDesign()
 
 // const prefixCls = getPrefixCls('setting')
-
-const appStore = useAppStore()
 //
 // const { t } = useI18n()
 //

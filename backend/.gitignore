@@ -1,0 +1,11 @@
+target/
+*.class
+.idea/
+*.iml
+.vscode/
+data/
+logs/
+.mysql-data/
+*.log
+.DS_Store
+**/.DS_Store

@@ -1,10 +1,9 @@
 <script lang="js">
 // 教师查看班级列表的界面 ARM页面
 import MyEditor from '@/views/Dashboard/components/MyEditor.vue'
-import { useUserStore } from '@/store/modules/user'
 import { ElMessage } from 'element-plus'
-import axios from 'axios'
-import { reject } from 'lodash-es'
+import { initMySubmission, updateSubmission } from '@/api/equip/submissions'
+import { uploadFile } from '@/api/equip/files'
 export default {
   components: { MyEditor },
   data() {
@@ -32,29 +31,38 @@ export default {
   },
   methods: {
     async PageInit() {
-      //我不知道为什么，但是请求两次就好了
-      let url = 'http://47.120.78.42:8090/zjgsEmb/Stu/selectHomeWorkByTeacherWorkIdAndGroupId'
-      await axios.get(url, {
-        params: {
-          TeacherWorkId: this.TeacherWorkId,
-          groupId: this.groupId
-        }
-      })
-      const res = await axios.get(url, {
-        params: {
-          TeacherWorkId: this.TeacherWorkId,
-          groupId: this.groupId
-        }
-      })
-      const data = res.data.data
-      console.log(data)
+      const data = await initMySubmission(this.TeacherWorkId)
       this.StuWorkId = data.id
-      this.workDoc = data.workDoc
-      this.infoUrl = data.zip
-      this.VideoUrl = data.video
+      this.workDoc = data.workDoc || ''
+      this.infoUrl = data.zipUrl || ''
+      this.VideoUrl = data.videoUrl || ''
+    },
+    async doUpload(params, apply) {
+      try {
+        const file = await uploadFile(params.file)
+        apply(file.url)
+        params.onSuccess?.(file)
+      } catch (error) {
+        console.error(error)
+      }
+    },
+    uploadZip(params) {
+      return this.doUpload(params, (url) => {
+        this.infoUrl = url
+      })
+    },
+    uploadVideo(params) {
+      return this.doUpload(params, (url) => {
+        this.VideoUrl = url
+      })
+    },
+    uploadPhoto(params) {
+      return this.doUpload(params, (url) => {
+        this.PhotoUrl = url
+      })
     },
     getUrlResVideo(res) {
-      this.VideoUrl = JSON.stringify(res)
+      this.VideoUrl = res?.url || ''
     },
     handlePreviewVideo(uploadFile) {
       const allowedExtensions = ['mp4', 'avi', 'mov', 'wmv', 'flv']
@@ -66,7 +74,7 @@ export default {
           grouping: true,
           type: 'warning'
         })
-        return reject()
+        return Promise.reject()
       }
 
       if (uploadFile.size > 1024 * 1024 * 300) {
@@ -78,8 +86,6 @@ export default {
         })
         return Promise.reject()
       }
-
-      return reject()
     },
     handlePreviewZip(uploadFile) {
       console.log(uploadFile.type)
@@ -105,7 +111,7 @@ export default {
       }
     },
     getUrlResZip(res) {
-      this.infoUrl = JSON.stringify(res)
+      this.infoUrl = res?.url || ''
     },
     handlePreviewPhoto(uploadFile) {
       const allowedExtensions = ['jpg', 'jpeg', 'png', 'webp']
@@ -132,22 +138,16 @@ export default {
       }
     },
     getUrlResPhoto(res) {
-      this.PhotoUrl = JSON.stringify(res)
+      this.PhotoUrl = res?.url || ''
     },
     async saveWork() {
-      const formData = new FormData()
-      formData.append('InfoUrl', this.infoUrl)
-      formData.append('StuWorkId', this.StuWorkId)
-      formData.append('Video', this.VideoUrl)
-      formData.append('workDoc', this.workDoc)
-      console.log(formData)
-
-      let url = 'http://47.120.78.42:8090/zjgsEmb/Stu/updateStuHomeWork'
-      const res = await axios.post(url, formData)
-      console.log(res.data)
-      if (res.data.state === 200) {
-        ElMessage.success('更新作业成功，继续编辑或退出')
-      }
+      await updateSubmission(this.StuWorkId, {
+        workDoc: this.workDoc,
+        videoUrl: this.VideoUrl,
+        zipUrl: this.infoUrl,
+        submit: true
+      })
+      ElMessage.success('更新作业成功，继续编辑或退出')
     }
   }
 }
@@ -164,9 +164,9 @@ export default {
       ><el-upload
         style="margin-top: 10px"
         class="upload-demo"
-        action="http://47.120.78.42:8090/upload"
+        action="#"
         multiple
-        :http-request="uploadMehod"
+        :http-request="uploadZip"
         :before-upload="handlePreviewZip"
         :on-success="getUrlResZip"
         :before-remove="beforeRemove"
@@ -178,9 +178,9 @@ export default {
       ><el-upload
         style="margin-top: 10px"
         class="upload-demo"
-        action="http://47.120.78.42:8090/upload"
+        action="#"
         multiple
-        :http-request="uploadMehod"
+        :http-request="uploadVideo"
         :before-upload="handlePreviewVideo"
         :on-success="getUrlResVideo"
         :before-remove="beforeRemove"
@@ -199,9 +199,9 @@ export default {
   <el-upload
     style="margin-top: 10px"
     class="upload-demo"
-    action="http://47.120.78.42:8090/upload"
+    action="#"
     multiple
-    :http-request="uploadMehod"
+    :http-request="uploadPhoto"
     :before-upload="handlePreviewPhoto"
     :on-success="getUrlResPhoto"
     :before-remove="beforeRemove"

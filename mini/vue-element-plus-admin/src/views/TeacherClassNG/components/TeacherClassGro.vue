@@ -1,7 +1,8 @@
 <script lang="js">
-import async from 'async'
-import axios from 'axios'
 import { useUserStore } from '@/store/modules/user'
+import { ElMessage } from 'element-plus'
+import { getClassGroups, deleteClassGroups } from '@/api/equip/groups'
+import { importGroups } from '@/api/equip/imports'
 export default {
   data() {
     return {
@@ -16,30 +17,14 @@ export default {
   },
   methods: {
     async getgroupData() {
-      let url = 'http://47.120.78.42:8090/zjgsEmb/TeacherImGro/SearchGro'
-      const res = await axios.get(url, {
-        params: {
-          classId: this.classIdX
-        }
-      })
-      console.log(res.data)
-      this.GroupData = res.data.data
-      console.log(this.GroupData)
+      this.GroupData = await getClassGroups(this.classIdX)
     },
     async uploadMehod(params) {
-      const file = params.file
-      const formData = new FormData()
-      // 添加其他参数到FormData中
-      formData.append('classId', this.classIdX)
-      // 将上传的文件添加到FormData中
-      formData.append('file', file)
       try {
-        let url = 'http://47.120.78.42:8090/zjgsEmb/TeacherImGro/ImportGro?classId'
-        const res = await axios.post(url, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }, //定义内容格式,很重要
-          timeout: 40000
-        })
-        console.log(res.data)
+        const res = await importGroups(this.classIdX, params.file)
+        ElMessage.success('导入小组成功')
+        params.onSuccess?.(res)
+        this.getgroupData()
       } catch (error) {
         console.error('Error handling preview:', error)
       }
@@ -62,12 +47,9 @@ export default {
       })
     },
     async DeleteUploadMehod() {
-      let url = 'hhttp://47.120.78.42:8090/zjgsEmb/TeacherImGro/deleteAllByClassId'
-      const res = await axios.get(url, {
-        param: {
-          classId: this.classIdX
-        }
-      })
+      await deleteClassGroups(this.classIdX)
+      ElMessage.success('删除成功')
+      this.getgroupData()
     }
   }
 }

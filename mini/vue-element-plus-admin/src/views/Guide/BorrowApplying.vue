@@ -16,7 +16,7 @@
       <!--    加入判断，是不是有图片资料的-->
       <el-image
         style="max-width: 400px; max-height: 680px"
-        :src="this.form.photoUrl ? this.form.photoUrl : '/src/assets/imgs/NoPhoto.jpg'"
+        :src="form.photoUrl ? form.photoUrl : '/src/assets/imgs/NoPhoto.jpg'"
       />
     </el-form-item>
     <!--    这里添加一个上传zip的upload 上传方法使用自己的upload(file)-->
@@ -28,13 +28,10 @@
 
 <!--记得换成js-->
 <script lang="js">
-import { reactive, ref } from 'vue'
-import { Plus } from '@element-plus/icons-vue'
-import axios from 'axios'
+import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { reject } from 'lodash-es'
-import async from 'async'
-import { useUserStore } from '@/store/modules/user'
+import { getEquipment } from '@/api/equip/equipments'
+import { createBorrow } from '@/api/equip/borrows'
 //传入这个界面的变量有两个，一个是 routerParam 区别add/editor 另一个是equipment
 export default {
   data() {
@@ -54,52 +51,40 @@ export default {
     }
   },
   created() {
-    const usrStore = new useUserStore()
     this.EquipId = this.$route.query.EquipmentId
-    this.StuId = usrStore.getStuId
     this.getEquipById()
   },
   methods: {
     handleChange() {
-      if (this.borrowNum + this.used >= this.form.number) {
+      if (this.borrowNum > this.form.number - this.used) {
         this.borrowNum = 0
         ElMessage.error('借用数量不能超过剩余数量')
       }
-      console.log(this.borrowNum)
     },
-    async getEquipById(id) {
-      let url = 'http://47.120.78.42:8090/zjgsEmb/EquipMent/getEquipmentById'
-      const res = await axios.get(url, {
-        params: {
-          id: this.EquipId
-        }
-      })
-      console.log(res.data.data)
-      const dataX = res.data.data
+    async getEquipById() {
+      const dataX = await getEquipment(this.EquipId)
       this.form.name = dataX.name
-      this.form.photoUrl = dataX.photoUrl.substring(1, dataX.photoUrl.length - 1)
-      console.log(dataX.photoUrl)
-      this.form.number = dataX.number
-      this.used = dataX.used
+      this.form.photoUrl = dataX.photoUrl || ''
+      this.form.number = dataX.totalNumber
+      this.used = dataX.usedNumber
+      this.form.infoUrl = dataX.infoUrl || null
       this.EquipId = dataX.id
       this.imageUrl = dataX.photoUrl
     },
     async ApplyingBorrow() {
-      let url = 'http://47.120.78.42:8090/zjgsEmb/EquipMent/StudentApplyEquipment'
-      const formData = new FormData()
-      formData.append('equipmentId', this.EquipId)
-      formData.append('num', this.borrowNum)
-      formData.append('stuId', this.StuId)
-      const res = axios.post(url, formData).then((res) => {
-        if (res.data.state === 300) {
-          ElMessage.success('你尚未加入班级')
-        } else {
-          ElMessage.success('申请成功，等待教师审核')
-        }
+      if (!this.borrowNum || this.borrowNum < 1) {
+        ElMessage.error('请输入借用数量')
+        return
+      }
+      try {
+        await createBorrow(this.EquipId, Number(this.borrowNum))
+        ElMessage.success('申请成功，等待教师审核')
         this.$router.push({
           path: '/guide/StuBorrow'
         })
-      })
+      } catch (error) {
+        console.error('申请借用失败', error)
+      }
     }
   }
 }

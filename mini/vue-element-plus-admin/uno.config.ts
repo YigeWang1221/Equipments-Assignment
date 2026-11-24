@@ -5,29 +5,18 @@ import { loadEnv } from 'vite'
 const root = process.cwd()
 
 const createPresetIcons = () => {
-  const isBuild = !!process.argv[4]
-  let env = {} as any
-  if (!isBuild) {
-    env = loadEnv(process.argv[3], root)
-  } else {
-    env = loadEnv(process.argv[4], root)
-  }
+  const modeIndex = process.argv.indexOf('--mode')
+  const mode = modeIndex >= 0 ? process.argv[modeIndex + 1] : 'base'
+  const env = loadEnv(mode, root)
   // @ts-ignore
   if (env.VITE_USE_ONLINE_ICON === 'true') {
     return []
-  } else {
-    return [
-      presetIcons({
-        prefix: ''
-        // 由于默认加载的是所有的图标，启动会非常慢，可以在这里去加载需要的图标，确保启动速度
-        // collections: {
-        //   carbon: () => import('@iconify-json/carbon/icons.json').then(i => i.default),
-        //   mdi: () => import('@iconify-json/mdi/icons.json').then(i => i.default),
-        //   logos: () => import('@iconify-json/logos/icons.json').then(i => i.default),
-        // }
-      })
-    ]
   }
+  return [
+    presetIcons({
+      prefix: ''
+    })
+  ]
 }
 
 export default defineConfig({
@@ -143,8 +132,14 @@ ${selector}:after {
   presets: [presetUno({ dark: 'class', attributify: false }), ...createPresetIcons()],
   transformers: [transformerVariantGroup()],
   content: {
+    filesystem: [
+      'src/**/*.{vue,ts,tsx,html}',
+      '!src/components/IconPicker/src/data/**',
+      'index.html'
+    ],
     pipeline: {
-      include: [/\.(vue|svelte|[jt]sx|mdx?|astro|elm|php|phtml|html|ts)($|\?)/]
+      include: [/\.(vue|svelte|[jt]sx|mdx?|astro|elm|php|phtml|html|ts)($|\?)/],
+      exclude: [/node_modules/, /IconPicker\/src\/data/, /\.vite/, /dist/]
     }
   }
 })
